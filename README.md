@@ -4,7 +4,56 @@ Simulación reproducible de enero a junio de 2025. Produce seis entregas mensual
 con cambios reales de negocio y errores controlados. No implementa el pipeline
 de limpieza ni construye las dimensiones SCD: esos son los ejercicios posteriores.
 
-## Ejecutar
+## Configurar dbt y DuckDB
+
+El proyecto de dbt está en `coffee_shop/`. Por ahora contiene la plantilla de
+Jaffle Shop, con sus modelos y seeds de ejemplo; todavía no transforma los datos
+de `data/coffee_2025/raw` ni implementa el pipeline incremental y SCD tipo 2.
+
+Desde la raíz del repositorio, instala las dependencias fijadas en `uv.lock`
+y comprueba la versión de dbt:
+
+```powershell
+uv sync --locked
+uv run --locked dbt --version
+New-Item -ItemType Directory -Path data -Force
+```
+
+La versión fijada es dbt 2.0.6. Su adaptador de DuckDB viene incorporado; no hace
+falta instalar el paquete `dbt-duckdb` de dbt v1. El proyecto ya está inicializado,
+por lo que no es necesario volver a ejecutar `dbt init` después de clonarlo.
+
+Crea `profiles.yml` en la raíz del repositorio, junto a `pyproject.toml`, con este
+contenido. Sustituye la ruta de ejemplo por la ruta absoluta a `data/coffee_shop.duckdb`
+en tu equipo; en Windows puedes usar `/` como separador:
+
+```yaml
+coffee_shop:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: 'C:/ruta/coffee-shop-pipeline/data/coffee_shop.duckdb'
+      schema: main
+      threads: 4
+```
+
+El nombre `coffee_shop` coincide con `profile:` en `coffee_shop/dbt_project.yml`.
+DuckDB crea el archivo de base de datos si todavía no existe. El perfil es local
+y está ignorado por Git, por lo que cada persona debe crear el suyo.
+
+Comprueba la conexión e instala los paquetes declarados en `coffee_shop/packages.yml`:
+
+```powershell
+uv run --locked dbt debug --project-dir coffee_shop --profiles-dir .
+uv run --locked dbt deps --project-dir coffee_shop --profiles-dir .
+```
+
+`dbt debug` debe terminar con `All checks passed!`. Los comandos indican
+explícitamente la carpeta del proyecto y la del perfil. La base de datos, los logs,
+`target/` y `dbt_packages/` también están ignorados por Git.
+
+## Ejecutar el generador
 
 Desde la raíz del proyecto (dependencias fijadas en `uv.lock`):
 

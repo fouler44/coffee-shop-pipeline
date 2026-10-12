@@ -16,5 +16,11 @@ data/
 *.duckdb
 *.duckdb.wal
 
-# Dbt profiles
+# dbt
 profiles.yml
+logs/
+target/
+dbt_packages/
+.env
+.env.*
+!.env.example
