@@ -8,7 +8,7 @@ de limpieza ni construye las dimensiones SCD: esos son los ejercicios posteriore
 
 El proyecto de dbt está en `coffee_shop/`. Por ahora contiene la plantilla de
 Jaffle Shop, con sus modelos y seeds de ejemplo; todavía no transforma los datos
-de `data/coffee_2025/raw` ni implementa el pipeline incremental y SCD tipo 2.
+de `data/coffee_2025_csv/raw` ni implementa el pipeline incremental y SCD tipo 2.
 
 Desde la raíz del repositorio, instala las dependencias fijadas en `uv.lock`
 y comprueba la versión de dbt:
@@ -63,7 +63,7 @@ uv run python coffee-data-generator/generate.py
 uv run python -m unittest discover -s coffee-data-generator/tests -v
 ```
 
-La salida predeterminada es `data/coffee_2025`. Para otra ejecución:
+La salida predeterminada es `data/coffee_2025_csv`. Para otra ejecución:
 
 ```powershell
 uv run python coffee-data-generator/generate.py --seed 42 --output data/otra_ejecucion
@@ -76,24 +76,34 @@ independientes del día real de ejecución. Importar `generate.py` no ejecuta na
 ## Archivos
 
 ```text
-data/coffee_2025/
+data/coffee_2025_csv/
   manifest.json
   raw/
     batch_001/ ... batch_006/
-      customers.jsonl
-      products.jsonl
-      orders.jsonl
-      order_items.jsonl
-      payments.jsonl
+      customers.csv
+      products.csv
+      orders.csv
+      order_items.csv
+      payments.csv
   reference/
     batch_001/ ... batch_006/  (las mismas cinco tablas, correctas)
-    business_changes.jsonl
-    injected_issues.jsonl
+    business_changes.csv
+    injected_issues.csv
 ```
 
-JSONL contiene un objeto JSON por línea, en UTF-8. Mantiene `true`, `false` y `null`
-sin convertirlos en texto. Fechas y horas se exportan en formato ISO 8601. Los
-timestamps representan hora local de Ciudad de México, sin offset UTC.
+CSV en UTF-8 sin BOM, con encabezado fijo incluso en archivos vacíos, separador
+coma y salto de línea LF. Los campos con comas, comillas o saltos de línea se
+encierran entre comillas dobles; las comillas internas se duplican. Los nulos se
+representan con `\N` (reservado; no se admite como texto literal); un campo vacío
+es texto vacío. Los booleanos se escriben `true` y `false`, y los números usan
+punto decimal sin separador de miles. CSV no almacena tipos: deben interpretarse
+según el contrato de columnas. No recortar espacios durante la lectura de RAW.
+Fechas: `YYYY-MM-DD`; timestamps: `YYYY-MM-DDTHH:MM:SS`, hora local de Ciudad de
+México sin offset UTC. `manifest.json` conserva formato JSON y declara `csv_format`.
+
+La salida predeterminada es ahora `data/coffee_2025_csv`; los archivos JSONL de
+una ejecución anterior en `data/coffee_2025` se conservan. Para regenerar utiliza
+otra carpeta si la salida CSV ya existe.
 
 `batch_001` corresponde a enero, entregado el 1 de febrero; el último corresponde
 a junio y se entrega el 1 de julio. Los periodos son [inicio, fin): incluyen el
@@ -101,6 +111,61 @@ inicio y excluyen el primer instante del mes siguiente. `manifest.json` contiene
 la configuración, los periodos, las entregas y los conteos de ambas capas.
 
 ## Contrato de las fuentes
+
+### Columnas y tipos lógicos
+
+Los tipos siguientes son los esperados después de interpretar el CSV, no una
+garantía de calidad de RAW: los errores intencionales se conservan. Los importes
+se deben interpretar como decimales, por ejemplo `DECIMAL(12,2)`; el archivo no
+incluye código de moneda. Los teléfonos son texto, no números.
+
+Columnas comunes a las cinco entidades:
+
+| Columna | Tipo | Significado |
+|---|---|---|
+| `source_record_id` | texto | Identificador del registro de origen dentro de la entidad; se repite en duplicados |
+| `batch_id` | texto | Lote de entrega del origen, de `batch_001` a `batch_006` |
+| `delivered_at` | timestamp local | Fecha de entrega, no fecha del evento ni de ingesta |
+
+| Archivo | Columnas propias y tipos |
+|---|---|
+| `customers.csv` | `customer_id` entero; `first_name`, `last_name`, `email`, `phone` texto; `birth_date`, `registered_at` fecha; `marketing_opt_in` booleano; `source_updated_at` timestamp local |
+| `products.csv` | `product_id` entero; `sku`, `name`, `category`, `size` texto; `price` decimal; `sales_weight` entero; `active` booleano; `source_updated_at` timestamp local |
+| `orders.csv` | `order_id`, `customer_id`, `item_count` entero; `ordered_at` timestamp local; `subtotal` decimal |
+| `order_items.csv` | `order_item_id`, `order_id`, `product_id`, `quantity` entero; `unit_price`, `line_total` decimal |
+| `payments.csv` | `payment_id`, `order_id` entero; `payment_method`, `status` texto; `amount` decimal; `paid_at` timestamp local |
+
+- **Grano:** clientes y productos entregan un estado completo por versión; órdenes,
+  artículos y pagos entregan una fila por registro, más los duplicados inyectados.
+  `item_count` es la suma de unidades de la orden, no el número de líneas.
+- **Nulos:** `orders.customer_id` nulo es una venta sin cliente identificado y es
+  válido. `products.size` nulo indica que el tamaño no aplica al producto.
+  `customers.phone` puede faltar en RAW. `marketing_opt_in` nulo es un
+  error y no equivale a `false`. Las demás columnas de las cinco entidades no
+  tienen nulos previstos por este generador.
+- **Relaciones:** `orders.customer_id` apunta a clientes cuando no es nulo;
+  `order_items.order_id` y `payments.order_id` apuntan a órdenes;
+  `order_items.product_id` apunta a productos. Clientes y productos tienen varias
+  versiones: su ID de negocio no es único en el histórico recibido.
+- **Importes correctos:** `quantity > 0`, `line_total = quantity * unit_price`,
+  `subtotal = SUM(line_total)` por orden y `amount = subtotal`. En RAW puede haber
+  cantidades negativas inyectadas sin recalcular los demás importes; deben
+  detectarse, no aceptarse como devoluciones.
+- **Pagos:** en la simulación hay un pago por orden antes de duplicados;
+  `status` es `COMPLETED` y el método normalizado pertenece a `CREDIT_CARD`,
+  `DEBIT_CARD`, `CASH` o `DIGITAL_WALLET`. Un pago puede llegar en el siguiente lote.
+- **Catálogo:** `sales_weight` es un peso utilizado para simular la selección de
+  productos; no mide ventas observadas. Hay 36 productos y `active` es `true`.
+
+Los reportes de validación también son CSV. `business_changes.csv` contiene
+`table,entity_id,field,before,after,source_updated_at`; `injected_issues.csv`
+contiene `batch_id,table,source_record_id,kind,field,before,after,expected_batch,actual_batch`.
+En ambos, `before` y `after` contienen valores JSON dentro de la celda CSV para
+preservar su tipo variable: `null`, booleano, número o texto entrecomillado JSON.
+Una columna no aplicable usa `\N`; se distingue del valor JSON `null` registrado
+explícitamente. Estos reportes solo sirven para validación.
+
+### Reglas de entrega e historia
 
 - Cada fila contiene `source_record_id`, `batch_id` y `delivered_at`.
 - `source_record_id` identifica un registro de origen y se conserva en duplicados
@@ -171,8 +236,8 @@ metadatos representan la entrega prevista; los de raw representan la real.
 Por ello no compares directamente los conteos de pagos de un solo mes entre ambas
 capas: reconcilia por ID y considera las entregas siguientes.
 
-`business_changes.jsonl` enumera entidad, campo, valor anterior, valor nuevo y
-fecha efectiva. `injected_issues.jsonl` enumera las alteraciones con el ID del
+`business_changes.csv` enumera entidad, campo, valor anterior, valor nuevo y
+fecha efectiva. `injected_issues.csv` enumera las alteraciones con el ID del
 registro; para datos tardíos indica el batch previsto y el real.
 
 Los espacios y duplicados pueden corregirse. Un teléfono eliminado o correo

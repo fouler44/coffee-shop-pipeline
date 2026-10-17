@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import datetime
+import csv
 import json
 from pathlib import Path
 import sys
@@ -7,7 +8,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from batches import Config, TABLES, build_dataset, export_dataset
+from batches import Config, TABLES, CSV_COLUMNS, build_dataset, export_dataset, write_csv
 
 
 class BatchTests(unittest.TestCase):
@@ -91,15 +92,56 @@ class BatchTests(unittest.TestCase):
     def test_export_round_trip_and_no_overwrite(self):
         with tempfile.TemporaryDirectory() as directory:
             path = export_dataset(self.dataset, Path(directory) / "exercise")
-            self.assertEqual(len(list(path.glob("raw/*/*.jsonl"))), 30)
+            self.assertEqual(len(list(path.glob("raw/*/*.csv"))), 30)
             for table in TABLES:
                 for batch in self.dataset["batches"]:
                     for layer in ("raw", "reference"):
-                        file = path / layer / batch["batch_id"] / f"{table}.jsonl"
-                        rows = [json.loads(line) for line in file.read_text(encoding="utf-8").splitlines()]
+                        file = path / layer / batch["batch_id"] / f"{table}.csv"
+                        with file.open(encoding="utf-8", newline="") as handle:
+                            rows = list(csv.DictReader(handle))
                         self.assertEqual(len(rows), len(batch[layer][table]))
+                        for actual, expected in zip(rows, batch[layer][table]):
+                            for key, value in expected.items():
+                                if value is None:
+                                    self.assertEqual(actual[key], "\\N")
+                                elif isinstance(value, bool):
+                                    self.assertEqual(json.loads(actual[key]), value)
+                                elif isinstance(value, (int, float)):
+                                    self.assertEqual(float(actual[key]), value)
+                                elif isinstance(value, datetime) or hasattr(value, "isoformat"):
+                                    self.assertEqual(actual[key], value.isoformat())
+                                else:
+                                    self.assertEqual(actual[key], value)
+            for name, expected in (("business_changes", self.dataset["changes"]),
+                                   ("injected_issues", self.dataset["issues"])):
+                with (path / "reference" / f"{name}.csv").open(encoding="utf-8", newline="") as handle:
+                    rows = list(csv.DictReader(handle))
+                self.assertEqual(len(rows), len(expected))
+                for actual, original in zip(rows, expected):
+                    for key in ("before", "after"):
+                        if key in original:
+                            self.assertEqual(json.loads(actual[key]), original[key])
+                        else:
+                            self.assertEqual(actual[key], "\\N")
             with self.assertRaises(FileExistsError):
                 export_dataset(self.dataset, path)
+
+    def test_csv_quoting_nulls_and_empty_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "example.csv"
+            row = {"text": 'Café, "grande"\nsegunda línea', "empty": "", "missing": None,
+                   "yes": True, "no": False}
+            write_csv(path, [row], tuple(row))
+            with path.open(encoding="utf-8", newline="") as handle:
+                actual = list(csv.DictReader(handle))[0]
+            self.assertEqual(actual, dict(row, missing="\\N", yes="true", no="false"))
+            write_csv(path, [], CSV_COLUMNS["customers"])
+            with path.open(encoding="utf-8", newline="") as handle:
+                reader = csv.DictReader(handle)
+                self.assertEqual(reader.fieldnames, list(CSV_COLUMNS["customers"]))
+                self.assertEqual(list(reader), [])
+            with self.assertRaises(ValueError):
+                write_csv(path, [{"text": "\\N"}], ("text",))
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ def main():
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--customers", type=int, default=2000)
     parser.add_argument("--output", type=Path,
-                        default=Path(__file__).resolve().parents[1] / "data" / "coffee_2025")
+                        default=Path(__file__).resolve().parents[1] / "data" / "coffee_2025_csv")
     for name, value in Config().__dict__.items():
         if name.endswith("_rate"):
             parser.add_argument("--" + name.replace("_", "-"), type=float, default=value)

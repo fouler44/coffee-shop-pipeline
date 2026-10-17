@@ -3,6 +3,7 @@
 from copy import deepcopy
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta
+import csv
 import json
 from pathlib import Path
 import random
@@ -19,6 +20,25 @@ PRIMARY_KEYS = {
     "customers": "customer_id", "products": "product_id",
     "orders": "order_id", "order_items": "order_item_id",
     "payments": "payment_id",
+}
+METADATA_COLUMNS = ("source_record_id", "batch_id", "delivered_at")
+CSV_COLUMNS = {
+    "customers": ("customer_id", "first_name", "last_name", "email", "phone",
+                  "birth_date", "registered_at", "marketing_opt_in", "source_updated_at") + METADATA_COLUMNS,
+    "products": ("product_id", "sku", "name", "category", "size", "price",
+                 "sales_weight", "active", "source_updated_at") + METADATA_COLUMNS,
+    "orders": ("order_id", "customer_id", "ordered_at", "item_count", "subtotal") + METADATA_COLUMNS,
+    "order_items": ("order_item_id", "order_id", "product_id", "quantity",
+                    "unit_price", "line_total") + METADATA_COLUMNS,
+    "payments": ("payment_id", "order_id", "payment_method", "amount", "status", "paid_at") + METADATA_COLUMNS,
+    "business_changes": ("table", "entity_id", "field", "before", "after", "source_updated_at"),
+    "injected_issues": ("batch_id", "table", "source_record_id", "kind", "field",
+                        "before", "after", "expected_batch", "actual_batch"),
+}
+CSV_FORMAT = {
+    "encoding": "utf-8", "delimiter": ",", "quotechar": '"',
+    "null_value": "\\N", "boolean_values": ["true", "false"],
+    "report_json_columns": ["before", "after"],
 }
 
 
@@ -232,10 +252,28 @@ def json_default(value):
     raise TypeError(f"Cannot serialize {type(value)}")
 
 
-def write_jsonl(path, rows):
-    with path.open("w", encoding="utf-8", newline="\n") as handle:
+def csv_value(value):
+    if value is None:
+        return "\\N"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    if value == "\\N":
+        raise ValueError("Literal \\N is reserved for CSV nulls")
+    return value
+
+
+def write_csv(path, rows, columns, json_columns=()):
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns, lineterminator="\n")
+        writer.writeheader()
         for row in rows:
-            handle.write(json.dumps(row, default=json_default, ensure_ascii=False) + "\n")
+            writer.writerow({
+                key: (json.dumps(value, default=json_default, ensure_ascii=False)
+                      if key in json_columns else csv_value(value))
+                for key, value in row.items()
+            } | {key: "\\N" for key in columns if key not in row})
 
 
 def export_dataset(dataset, output):
@@ -250,16 +288,18 @@ def export_dataset(dataset, output):
             directory.mkdir(parents=True)
             counts[layer] = {}
             for table, rows in batch[layer].items():
-                write_jsonl(directory / f"{table}.jsonl", rows)
+                write_csv(directory / f"{table}.csv", rows, CSV_COLUMNS[table])
                 counts[layer][table] = len(rows)
         summary.append({
             key: value for key, value in batch.items() if key not in ("raw", "reference")
         } | {"counts": counts})
-    write_jsonl(output / "reference" / "business_changes.jsonl", dataset["changes"])
-    write_jsonl(output / "reference" / "injected_issues.jsonl", dataset["issues"])
+    for name, rows in (("business_changes", dataset["changes"]), ("injected_issues", dataset["issues"])):
+        write_csv(output / "reference" / f"{name}.csv", rows, CSV_COLUMNS[name],
+                  json_columns=("before", "after"))
     manifest = {"config": dataset["config"], "batches": summary,
                 "timezone": "America/Mexico_City (local timestamps without UTC offset)",
-                "reference_grouping": "event month before delays and corruption"}
+                "reference_grouping": "event month before delays and corruption",
+                "file_format": "csv", "csv_format": CSV_FORMAT}
     with (output / "manifest.json").open("w", encoding="utf-8") as handle:
         json.dump(manifest, handle, default=json_default, ensure_ascii=False, indent=2)
     return output
