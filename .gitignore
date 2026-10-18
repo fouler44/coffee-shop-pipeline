@@ -24,3 +24,6 @@ dbt_packages/
 .env
 .env.*
 !.env.example
+
+# Local data exploration
+/sandbox.py
