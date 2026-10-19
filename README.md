@@ -34,7 +34,7 @@ coffee_shop:
     dev:
       type: duckdb
       path: 'C:/ruta/coffee-shop-pipeline/data/coffee_shop.duckdb'
-      schema: main
+      schema: dev
       threads: 4
 ```
 
@@ -52,6 +52,29 @@ uv run --locked dbt deps --project-dir coffee_shop --profiles-dir .
 `dbt debug` debe terminar con `All checks passed!`. Los comandos indican
 explícitamente la carpeta del proyecto y la del perfil. La base de datos, los logs,
 `target/` y `dbt_packages/` también están ignorados por Git.
+
+## Preparar bronze de desarrollo
+
+Se usa una sola base persistente, `data/coffee_shop.duckdb`. En desarrollo todas
+las capas comparten el esquema `dev`; en producción se usarán `bronze`, `silver`
+y `gold`. Los nombres de tablas y modelos dentro de `dev` deberán ser distintos.
+
+Desde la raíz del repositorio:
+
+```powershell
+uv run --locked python warehouse/01_setup.py
+```
+
+El script abre o crea la base y crea `dev` si no existe. Puede repetirse sin borrar
+los datos. Todavía no crea tablas ni carga CSV. La macro `generate_schema_name`
+agrupa los modelos en `target.schema` para los targets `dev` y `ci`; para `prod`
+usa el esquema personalizado configurado en cada modelo. No configura la ingesta
+ni los sources. Aún falta adaptar los modelos y sources de la plantilla al pipeline
+y definir el target de producción.
+
+`warehouse/` contiene la implementación actual de preparación del almacén.
+Cuando migremos a Snowflake se sustituirá esa implementación; Git conservará
+la versión de DuckDB.
 
 ## Ejecutar el generador
 
