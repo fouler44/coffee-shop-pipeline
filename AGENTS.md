@@ -27,8 +27,13 @@ Archivos de origen
   -> dbt gold: modelos para análisis
 ```
 
-- Usar inicialmente una base de datos con esquemas bronze, silver y gold.
-  Estos nombres identifican las capas de recepción, transformación y análisis.
+- Usar una base de datos: en dev todas las capas comparten el esquema dev;
+  en prod se separan en bronze, silver y gold. La macro generate_schema_name
+  usa target.schema en dev/ci y el esquema personalizado en prod. Los sources
+  y la ingesta deben configurarse por entorno aparte; la macro no los redirige.
+  DuckDB es temporal:
+  al migrar a Snowflake se sustituye la implementación en warehouse/, sin
+  mantener dos implementaciones paralelas.
 - Las tablas bronze se declaran como sources de dbt; los modelos siguientes usan
   source() y ref() según corresponda. Declarar sources no carga ni crea las tablas.
 - S3 conserva archivos; bronze conserva los registros cargados. Son garantías
