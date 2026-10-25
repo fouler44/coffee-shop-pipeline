@@ -1,5 +1,6 @@
 sources:
   - name: bronze
+    description: This layer contains the raw data ingested from the source systems.
     database: coffee_shop
     schema: dev
     tables:

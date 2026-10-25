@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9
+        with:
+          version: "0.11.15"
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Install locked dependencies
+        run: uv sync --locked
+
+      - name: Test data generator
+        run: uv run --locked python -m unittest discover -s coffee-data-generator/tests -v
+
+      - name: Prepare local DuckDB database
+        run: uv run --locked python warehouse/01_setup.py
+
+      # dbt build se añadirá cuando la ingesta cree las tablas bronze
+      # y existan modelos del pipeline habilitados para validarlas.
