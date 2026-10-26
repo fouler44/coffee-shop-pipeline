@@ -1,0 +1,81 @@
+sources:
+  - name: bronze
+    description: This layer contains the raw data ingested from the source systems.
+    database: coffee_shop
+    schema: dev
+    tables:
+      - name: customers
+        description: This table contains the raw data of customers ingested from the source system.
+        columns:
+          - name: _batch_id
+            data_tests:
+              - not_null
+          - name: _source_file
+            data_tests:
+              - not_null
+          - name: _source_row_number
+            data_tests:
+              - not_null
+          - name: _ingested_at
+            data_tests:
+              - not_null
+      - name: orders
+        description: This table contains the raw data of orders ingested from the source system.
+        columns:
+          - name: _batch_id
+            data_tests:
+              - not_null
+          - name: _source_file
+            data_tests:
+              - not_null
+          - name: _source_row_number
+            data_tests:
+              - not_null
+          - name: _ingested_at
+            data_tests:
+              - not_null
+      - name: products
+        description: This table contains the raw data of products ingested from the source system.
+        columns:
+          - name: _batch_id
+            data_tests:
+              - not_null
+          - name: _source_file
+            data_tests:
+              - not_null
+          - name: _source_row_number
+            data_tests:
+              - not_null
+          - name: _ingested_at
+            data_tests:
+              - not_null
+      - name: order_items
+        description: This table contains the raw data of order items ingested from the source system.
+        columns:
+          - name: _batch_id
+            data_tests:
+              - not_null
+          - name: _source_file
+            data_tests:
+              - not_null
+          - name: _source_row_number
+            data_tests:
+              - not_null
+          - name: _ingested_at
+            data_tests:
+              - not_null
+      - name: payments
+        description: This table contains the raw data of payments ingested from the source system.
+        columns:
+          - name: _batch_id
+            data_tests:
+              - not_null
+          - name: _source_file
+            data_tests:
+              - not_null
+          - name: _source_row_number
+            data_tests:
+              - not_null
+          - name: _ingested_at
+            data_tests:
+              - not_null

@@ -9,16 +9,9 @@ clean-targets:
   - "target"
   - "dbt_packages"
 
-seeds:
-  # Builds seeds into '<your_schema_name>_raw'
-  coffee_shop:
-    +schema: raw
-
 models:
   coffee_shop:
-    +static_analysis: strict
-    # Materialize staging models as views, and marts as tables
-    staging:
-      +materialized: view
     marts:
+      +enabled: false
+    silver:
       +materialized: table
