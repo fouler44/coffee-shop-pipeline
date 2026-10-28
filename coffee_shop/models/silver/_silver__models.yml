@@ -28,6 +28,14 @@ models:
           - not_null
           - unique
 
+      - name: subtotal
+        description: The total price of the order.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "> 0"
+
   - name: silver_products
     description: >
       Contains a row for each source_record_id, after removing duplicates.
@@ -44,3 +52,36 @@ models:
         description: Date and time of the last update in the source system, independent of the delivery.
         data_tests:
           - not_null
+
+  - name: silver_order_items
+    description: >
+      Contains a row for each source_record_id, after removing duplicates.
+      It keeps quality indicators and traceability metadata.
+    
+    columns:
+      - name: source_record_id
+        description: The unique identifier of the order item record in the source system.
+        data_tests:
+          - not_null
+          - unique
+      
+      - name: quantity
+        description: The quantity of the product in the order item.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "> 0"
+      
+      - name: unit_price
+        description: The price of the product per unit.
+        data_tests:
+          - not_null
+      
+      - name: line_total
+        description: The total price of the order item (quantity * unit price).
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "= quantity * unit_price"
