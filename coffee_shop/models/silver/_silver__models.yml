@@ -1,0 +1,46 @@
+models:
+  - name: silver_customers
+    description: >
+      Contains a row for each source_record_id, after removing duplicates.
+      It keeps quality indicators and traceability metadata.
+    
+    columns:
+      - name: source_record_id
+        description: The unique identifier of the customer record in the source system.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: source_updated_at
+        description: Date and time of the last update in the source system, independent of the delivery.
+        data_tests:
+          - not_null
+
+  - name: silver_orders
+    description: >
+      Contains a row for each source_record_id, after removing duplicates.
+      It keeps quality indicators and traceability metadata.
+    
+    columns:
+      - name: source_record_id
+        description: The unique identifier of the order record in the source system.
+        data_tests:
+          - not_null
+          - unique
+
+  - name: silver_products
+    description: >
+      Contains a row for each source_record_id, after removing duplicates.
+      It keeps quality indicators and traceability metadata.
+    
+    columns:
+      - name: source_record_id
+        description: The unique identifier of the product record in the source system.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: source_updated_at
+        description: Date and time of the last update in the source system, independent of the delivery.
+        data_tests:
+          - not_null
