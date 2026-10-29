@@ -1,35 +1,49 @@
 models:
   - name: silver_customers
     description: >
-      Contains a row for each source_record_id, after removing duplicates.
-      It keeps quality indicators and traceability metadata.
+      One row per source customer version, deduplicated by source_record_id.
+      Normalizes contact details and flags quality issues while preserving
+      historical versions and traceability metadata.
     
     columns:
       - name: source_record_id
-        description: The unique identifier of the customer record in the source system.
+        description: >
+          Source identifier for a customer version, used to remove duplicate
+          deliveries of that record. Distinct versions of the same customer_id
+          have different identifiers. Unique within this model.
         data_tests:
           - not_null
           - unique
 
       - name: source_updated_at
-        description: Date and time of the last update in the source system, independent of the delivery.
+        description: >
+          Effective timestamp of the customer state in the source, in Mexico
+          City local time without a time zone offset. Used to order customer
+          history independently of delivery and ingestion times.
         data_tests:
           - not_null
 
   - name: silver_orders
     description: >
-      Contains a row for each source_record_id, after removing duplicates.
-      It keeps quality indicators and traceability metadata.
+      One row per order, deduplicated by source_record_id and cast to expected
+      types. Preserves anonymous sales, received counts and amounts, and
+      traceability metadata.
     
     columns:
       - name: source_record_id
-        description: The unique identifier of the order record in the source system.
+        description: >
+          Source identifier for an order record, preserved across duplicate
+          deliveries and used for deduplication. Unique within this model;
+          order_id identifies the business order.
         data_tests:
           - not_null
           - unique
 
       - name: subtotal
-        description: The total price of the order.
+        description: >
+          Order subtotal received from the source, stored as a decimal with two
+          fractional digits. Expected to equal the sum of line_total across the
+          order's deduplicated lines. No currency code is provided by the source.
         data_tests:
           - not_null
           - dbt_utils.expression_is_true:
@@ -38,48 +52,73 @@ models:
 
   - name: silver_products
     description: >
-      Contains a row for each source_record_id, after removing duplicates.
-      It keeps quality indicators and traceability metadata.
+      One row per source product version, deduplicated by source_record_id.
+      Normalizes product text while preserving historical prices and
+      traceability metadata. Absence from a delivery does not indicate removal.
     
     columns:
       - name: source_record_id
-        description: The unique identifier of the product record in the source system.
+        description: >
+          Source identifier for a product version, used to remove duplicate
+          deliveries of that record. Distinct versions of the same product_id
+          have different identifiers. Unique within this model.
         data_tests:
           - not_null
           - unique
 
       - name: source_updated_at
-        description: Date and time of the last update in the source system, independent of the delivery.
+        description: >
+          Effective timestamp of the product state in the source, in Mexico
+          City local time without a time zone offset. Used to order product
+          price history independently of delivery and ingestion times.
         data_tests:
           - not_null
 
   - name: silver_order_items
     description: >
-      Contains a row for each source_record_id, after removing duplicates.
-      It keeps quality indicators and traceability metadata.
+      One row per order line, deduplicated by source_record_id. Corrects negative
+      quantities only when a positive unit price and the received line total
+      support the sign change. Preserves traceability metadata.
     
     columns:
       - name: source_record_id
-        description: The unique identifier of the order item record in the source system.
+        description: >
+          Source identifier for an order line record, preserved across duplicate
+          deliveries and used for deduplication. Unique within this model;
+          order_item_id identifies the business order line.
         data_tests:
           - not_null
           - unique
       
       - name: quantity
-        description: The quantity of the product in the order item.
+        description: >
+          Number of units in the order line. Includes the source-specific sign
+          correction when the received amounts support it. The expected value
+          is greater than zero.
         data_tests:
           - not_null
           - dbt_utils.expression_is_true:
               arguments:
                 expression: "> 0"
       
+      - name: quantity_was_corrected
+        description: >
+          True when a negative quantity was converted to a positive value under
+          the sign correction rule. This flag does not indicate whether the
+          entire row is valid.
+
       - name: unit_price
-        description: The price of the product per unit.
+        description: >
+          Price per unit applied to the sale, preserved from the source.
+          Represents the historical transaction price, which may differ from
+          the current catalog price.
         data_tests:
           - not_null
       
       - name: line_total
-        description: The total price of the order item (quantity * unit price).
+        description: >
+          Total amount for the order line, preserved from the source rather than
+          recalculated. Expected to equal quantity multiplied by unit_price.
         data_tests:
           - not_null
           - dbt_utils.expression_is_true:

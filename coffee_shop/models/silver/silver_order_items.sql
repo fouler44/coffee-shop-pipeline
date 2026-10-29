@@ -14,8 +14,16 @@ clean as (
                 and line_total::decimal(12, 2)
                 = -quantity::int * unit_price::decimal(12, 2)
             then -quantity::int
-        else quantity::int
+            else quantity::int
         end as quantity,
+        case
+            when quantity::int < 0
+                and unit_price::decimal(12, 2) > 0
+                and line_total::decimal(12, 2)
+                = -quantity::int * unit_price::decimal(12, 2)
+            then true
+            else false
+        end as quantity_was_corrected,
         unit_price :: decimal(12, 2) as unit_price,
         line_total :: decimal(12, 2) as line_total,
         source_record_id,
