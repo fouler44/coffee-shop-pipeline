@@ -1,0 +1,389 @@
+models:
+  - name: silver_customers
+    description: >
+      One row per source customer version, deduplicated by source_record_id.
+      Normalizes contact details and flags quality issues while preserving
+      historical versions and traceability metadata.
+
+    columns:
+      - name: source_record_id
+        description: >
+          Source record identifier used for deduplication; distinct source versions
+          have different IDs.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: source_updated_at
+        description: >
+          Effective source version timestamp, independent of delivery and ingestion.
+          Mexico City local time, without an offset.
+        data_tests:
+          - not_null
+
+      - name: customer_id
+        description: >
+          Business customer ID shared across historical versions; not unique in this
+          model.
+        data_tests:
+          - not_null
+
+      - name: email
+        description: >
+          Trimmed and lowercased; malformed values are retained.
+
+
+      - name: email_is_valid
+        description: >
+          Basic format check only; false for missing or malformed emails. Does not
+          verify mailbox existence.
+
+
+      - name: phone_normalized
+        description: >
+          Removes whitespace, parentheses, periods, and hyphens. Preserves prefixes
+          and extension markers; does not validate the number.
+
+
+      - name: marketing_opt_in
+        description: >
+          Null means missing consent, not false.
+
+
+      - name: batch_id
+        description: >
+          Actual source delivery batch, which may differ from the event month.
+
+
+      - name: delivered_at
+        description: >
+          Source delivery time in Mexico City local time, without an offset.
+
+
+      - name: _batch_id
+        description: >
+          Ingestion batch taken from the folder name; separate from source batch_id.
+
+
+      - name: _source_file
+        description: >
+          Source CSV path relative to the raw root.
+
+
+      - name: _source_row_number
+        description: >
+          One-based data row in the source CSV, excluding the header.
+
+
+      - name: _ingested_at
+        description: >
+          Time zone-aware bronze ingestion timestamp, preserved during transformation.
+
+  - name: silver_orders
+    description: >
+      One row per order, deduplicated by source_record_id and cast to expected
+      types. Preserves anonymous sales, received counts and amounts, and
+      traceability metadata.
+
+    columns:
+      - name: source_record_id
+        description: >
+          Source record identifier used for deduplication; distinct source versions
+          have different IDs.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: subtotal
+        description: >
+          Received subtotal; expected to equal the sum of deduplicated line totals.
+          Currency is unspecified.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "> 0"
+
+      - name: customer_id
+        description: >
+          Null indicates a sale without an identified customer.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('silver_customers')
+                field: customer_id
+
+      - name: ordered_at
+        description: >
+          Order time used to select historical prices. Mexico City local time, without
+          an offset.
+
+
+      - name: item_count
+        description: >
+          Sum of units across order lines, not the number of lines.
+
+
+      - name: batch_id
+        description: >
+          Actual source delivery batch, which may differ from the event month.
+
+
+      - name: delivered_at
+        description: >
+          Source delivery time in Mexico City local time, without an offset.
+
+
+      - name: _batch_id
+        description: >
+          Ingestion batch taken from the folder name; separate from source batch_id.
+
+
+      - name: _source_file
+        description: >
+          Source CSV path relative to the raw root.
+
+
+      - name: _source_row_number
+        description: >
+          One-based data row in the source CSV, excluding the header.
+
+
+      - name: _ingested_at
+        description: >
+          Time zone-aware bronze ingestion timestamp, preserved during transformation.
+
+  - name: silver_products
+    description: >
+      One row per source product version, deduplicated by source_record_id.
+      Normalizes product text while preserving historical prices and
+      traceability metadata. Absence from a delivery does not indicate removal.
+
+    columns:
+      - name: source_record_id
+        description: >
+          Source record identifier used for deduplication; distinct source versions
+          have different IDs.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: source_updated_at
+        description: >
+          Effective source version timestamp, independent of delivery and ingestion.
+          Mexico City local time, without an offset.
+        data_tests:
+          - not_null
+
+      - name: product_id
+        description: >
+          Business product ID shared across historical versions; not unique in this
+          model.
+
+
+      - name: size
+        description: >
+          Null means size does not apply.
+
+
+      - name: price
+        description: >
+          Catalog unit price for this source version. Currency is unspecified.
+
+
+      - name: batch_id
+        description: >
+          Actual source delivery batch, which may differ from the event month.
+
+
+      - name: delivered_at
+        description: >
+          Source delivery time in Mexico City local time, without an offset.
+
+
+      - name: _batch_id
+        description: >
+          Ingestion batch taken from the folder name; separate from source batch_id.
+
+
+      - name: _source_file
+        description: >
+          Source CSV path relative to the raw root.
+
+
+      - name: _source_row_number
+        description: >
+          One-based data row in the source CSV, excluding the header.
+
+
+      - name: _ingested_at
+        description: >
+          Time zone-aware bronze ingestion timestamp, preserved during transformation.
+
+  - name: silver_order_items
+    description: >
+      One row per order line, deduplicated by source_record_id. Corrects negative
+      quantities only when a positive unit price and the received line total
+      support the sign change. Preserves traceability metadata.
+
+    columns:
+      - name: source_record_id
+        description: >
+          Source record identifier used for deduplication; distinct source versions
+          have different IDs.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: quantity
+        description: >
+          Units sold, with conditional sign correction as described at model level.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "> 0"
+
+      - name: quantity_was_corrected
+        description: >
+          True when the sign correction was applied; does not certify overall row
+          validity.
+
+
+      - name: unit_price
+        description: >
+          Historical unit price applied to the sale, not the current catalog price.
+        data_tests:
+          - not_null
+
+      - name: line_total
+        description: >
+          Received amount, not recalculated; expected to equal quantity * unit_price.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "= quantity * unit_price"
+
+      - name: product_id
+        description: >
+          Shared across product versions; historical matching also requires the order
+          time.
+
+
+      - name: batch_id
+        description: >
+          Actual source delivery batch, which may differ from the event month.
+
+
+      - name: delivered_at
+        description: >
+          Source delivery time in Mexico City local time, without an offset.
+
+
+      - name: _batch_id
+        description: >
+          Ingestion batch taken from the folder name; separate from source batch_id.
+
+
+      - name: _source_file
+        description: >
+          Source CSV path relative to the raw root.
+
+
+      - name: _source_row_number
+        description: >
+          One-based data row in the source CSV, excluding the header.
+
+
+      - name: _ingested_at
+        description: >
+          Time zone-aware bronze ingestion timestamp, preserved during transformation.
+
+  - name: silver_payments
+    description: >
+      One row per payment, deduplicated by source_record_id. Preserves traceability
+      metadata and the original payment amount received from the source.
+
+    columns:
+      - name: source_record_id
+        description: >
+          Source record identifier used for deduplication; distinct source versions
+          have different IDs.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: order_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('silver_orders')
+                field: order_id
+
+      - name: payment_method
+        description: >
+          Trimmed and uppercased.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:   ['CREDIT_CARD', 'DEBIT_CARD', 'CASH', 'DIGITAL_WALLET']
+          - not_null
+
+      - name: paid_at
+        description: >
+          Payment event time, preserved for late deliveries. Mexico City local time,
+          without an offset.
+        data_tests:
+          - not_null
+
+      - name: payment_id
+        description: >
+          Unique payment ID; this simulation has one payment per order.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: amount
+        description: >
+          Expected to equal the order subtotal. Currency is unspecified.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "> 0"
+
+      - name: status
+        description: >
+          Expected to be COMPLETED in this simulation.
+
+
+      - name: batch_id
+        description: >
+          Actual source delivery batch, which may differ from the event month.
+
+
+      - name: delivered_at
+        description: >
+          Source delivery time in Mexico City local time, without an offset.
+
+
+      - name: _batch_id
+        description: >
+          Ingestion batch taken from the folder name; separate from source batch_id.
+
+
+      - name: _source_file
+        description: >
+          Source CSV path relative to the raw root.
+
+
+      - name: _source_row_number
+        description: >
+          One-based data row in the source CSV, excluding the header.
+
+
+      - name: _ingested_at
+        description: >
+          Time zone-aware bronze ingestion timestamp, preserved during transformation.
