@@ -269,7 +269,20 @@ models:
         description: >
           Shared across product versions; historical matching also requires the order
           time.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('silver_products')
+                field: product_id
 
+      - name: order_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('silver_orders')
+                field: order_id
 
       - name: batch_id
         description: >
