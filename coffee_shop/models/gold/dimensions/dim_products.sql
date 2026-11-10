@@ -21,10 +21,9 @@ final as (
 
         -- DW Values
         dbt_valid_from,
-        dbt_valid_to,
+        dbt_valid_to
 
-        from
-            products
+    from products
 )
 
 select *
