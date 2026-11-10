@@ -203,8 +203,12 @@ explícitamente. Estos reportes solo sirven para validación.
 - Los clientes existentes al 1 de enero se entregan como estado inicial en enero;
   los registrados después se entregan por primera vez en el mes de registro.
   Los cambios posteriores solo afectan `phone`, `email` y `marketing_opt_in`.
+  Un cliente nuevo puede cambiar a partir del mes siguiente a su primera entrega.
 - Todos los 36 productos aparecen inicialmente en enero. Solo cambia `price`:
   no se agregan ni se desactivan productos. Hay clientes y productos sin cambios.
+- Enero contiene solo estados iniciales, sin cambios de negocio. Desde febrero
+  se permite como máximo un cambio por entidad y mes. Cada lote contiene como
+  máximo una versión por cliente o producto, antes de los duplicados intencionales.
 - En los siguientes batches las dimensiones contienen solo nuevos registros o
   versiones modificadas; la ausencia de una entidad no representa una baja.
 - Una venta usa el precio válido en `ordered_at`. El artículo guarda ese precio
@@ -220,12 +224,21 @@ los atributos normalizados. Un duplicado no es una versión nueva. Los metadatos
 de entrega tampoco deben contarse como cambios de negocio. Para unir ventas a
 precios históricos, usa `ordered_at` dentro de [valid_from, valid_to).
 
+Bronze conserva las versiones recibidas. Tras deduplicar por `source_record_id`,
+`silver_products` y `silver_customers` seleccionan la última versión por
+`product_id` y `customer_id`, respectivamente, según `source_updated_at`.
+Para practicar snapshots de dbt, carga un lote, actualiza esos modelos y ejecuta
+las snapshots antes de cargar el siguiente. Las snapshots guardan el historial
+que observan en cada ejecución. Usa datos del generador actual para este
+ejercicio, ya que las ejecuciones anteriores conservan su comportamiento original.
+
 ## Cambios y errores configurables
 
-Cada mes se selecciona aproximadamente un 5% del total de clientes y un 15% de
-productos para cambios, dentro de una mitad del catálogo habilitada para cambiar.
+Desde febrero, cada mes se selecciona aproximadamente un 5% del total de clientes
+y un 15% de productos para cambios, dentro de una mitad del catálogo habilitada para cambiar.
 Esto preserva entidades sin modificaciones. Cada entidad seleccionada cambia un
 atributo en un instante aleatorio del mes, posterior a su versión anterior.
+Solo son elegibles las entidades entregadas en meses anteriores.
 
 Las tasas de errores se aplican a filas de la tabla correspondiente en cada batch
 y se redondean al entero más próximo; una tabla pequeña puede no recibir errores.

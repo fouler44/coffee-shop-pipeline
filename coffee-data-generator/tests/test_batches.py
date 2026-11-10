@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from batches import Config, TABLES, CSV_COLUMNS, build_dataset, export_dataset, write_csv
+from batches import Config, TABLES, CSV_COLUMNS, build_dataset, dimension_history, export_dataset, write_csv
 
 
 class BatchTests(unittest.TestCase):
@@ -38,6 +38,31 @@ class BatchTests(unittest.TestCase):
         self.assertTrue(all(r["active"] for r in self.rows["products"]))
         fields = {change["field"] for change in self.dataset["changes"]}
         self.assertEqual(fields, {"phone", "email", "marketing_opt_in", "price"})
+
+    def test_one_source_version_per_entity_per_batch(self):
+        for batch in self.dataset["batches"]:
+            for table, key in (("customers", "customer_id"), ("products", "product_id")):
+                for layer in ("reference", "raw"):
+                    with self.subTest(batch=batch["batch_id"], table=table, layer=layer):
+                        versions = defaultdict(set)
+                        for row in batch[layer][table]:
+                            versions[row[key]].add(row["source_record_id"])
+                        self.assertTrue(all(len(ids) == 1 for ids in versions.values()))
+
+    def test_changes_start_after_initial_delivery_even_at_maximum_rates(self):
+        for seed in (7, 42):
+            for customer_count in (1, 100):
+                with self.subTest(seed=seed, customer_count=customer_count):
+                    config = Config(seed=seed, customer_count=customer_count,
+                                    customer_change_rate=1, product_change_rate=1)
+                    _, customers, products, changes = dimension_history(config)
+                    self.assertTrue(changes)
+                    self.assertTrue(all(change["source_updated_at"].month >= 2
+                                        for change in changes))
+                    for rows, key in ((customers, "customer_id"), (products, "product_id")):
+                        deliveries = [(row[key], row["source_updated_at"].month)
+                                      for row in rows]
+                        self.assertEqual(len(deliveries), len(set(deliveries)))
 
     def test_clean_relationships_and_historical_prices(self):
         orders = {row["order_id"]: row for row in self.rows["orders"]}
