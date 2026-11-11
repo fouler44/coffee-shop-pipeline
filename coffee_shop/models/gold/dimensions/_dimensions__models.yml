@@ -1,0 +1,94 @@
+models:
+  - name: dim_products
+    description: >
+      One row per product version captured by products_snapshot. Match orders
+      by product_id and ordered_at within the version's validity interval.
+
+    columns:
+      - name: product_sk
+        description: Stable key for a product version, generated from source_record_id.
+        tests:
+          - not_null
+          - unique
+
+      - name: product_id
+        description: Business identifier shared by all versions of the same product.
+
+      - name: size
+        description: Null means size does not apply.
+
+      - name: price
+        description: >
+          Catalog unit price for this version. The unit price charged on a sale
+          comes from the order line. The source leaves the currency unspecified.
+
+      - name: active
+        description: Commercial status of the product during this version.
+
+      - name: source_record_id
+        description: Source identifier for this version, retained for traceability.
+
+      - name: dbt_valid_from
+        description: Inclusive start from source_updated_at in Mexico City local time.
+
+      - name: dbt_valid_to
+        description: Exclusive end in Mexico City local time. Null marks the current version.
+
+  - name: dim_customers
+    description: >
+      One row per customer version captured by customers_snapshot. Match orders
+      by customer_id and ordered_at within the version's validity interval.
+      A null customer ID on an order represents an anonymous sale.
+
+    columns:
+      - name: customer_sk
+        description: Stable key for a customer version, generated from source_record_id.
+        tests:
+          - not_null
+          - unique
+
+      - name: customer_id
+        description: Business identifier shared by all versions of the same customer.
+
+      - name: email_is_valid
+        description: Whether the email passes a basic format check.
+
+      - name: phone_normalized
+        description: >
+          Phone with whitespace, parentheses, periods, and hyphens removed.
+          Prefixes and extension markers are retained.
+
+      - name: marketing_opt_in
+        description: >
+          Marketing consent for this version. Null means the source did not
+          provide a consent value.
+
+      - name: source_record_id
+        description: Source identifier for this version, retained for traceability.
+
+      - name: dbt_valid_from
+        description: Inclusive start from source_updated_at in Mexico City local time.
+
+      - name: dbt_valid_to
+        description: Exclusive end in Mexico City local time. Null marks the current version.
+
+  - name: dim_date
+    description: >
+      One row per calendar day in 2025, including days without transactions.
+      Use the Mexico City local date of ordered_at for sales and paid_at for payments.
+
+    columns:
+      - name: date_day
+        description: Calendar date and unique key, stored as a DATE.
+        tests:
+          - not_null
+          - unique
+
+      - name: month_start_date
+        description: First day of the month, used to group and sort months across years.
+
+      - name: iso_day_of_week
+        description: ISO weekday number, from 1 for Monday to 7 for Sunday.
+
+      - name: is_weekend
+        description: True for Saturday and Sunday.
