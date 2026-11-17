@@ -55,3 +55,44 @@ models:
 
       - name: line_total
         description: Line amount carried from silver_order_items. Currency is unspecified.
+
+  - name: fct_payments
+    description: >
+      One row per payment recorded by the source. The payment links to an
+      order through order_id. Reporting uses the payment event date.
+    columns:
+      - name: payment_id
+        description: Source payment identifier and unique key of the fact.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: order_id
+        description: Source identifier of the order associated with the payment.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('silver_orders')
+                field: order_id
+
+      - name: payment_date
+        description: Local date derived from paid_at and key to the calendar.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_day
+
+      - name: amount
+        description: Payment amount carried from silver_payments. Currency is unspecified.
+
+      - name: paid_at
+        description: Payment event timestamp in Mexico City local time.
+
+      - name: payment_method
+        description: Normalized payment method recorded by the source.
+
+      - name: status
+        description: Source payment status. The generator emits COMPLETED.
