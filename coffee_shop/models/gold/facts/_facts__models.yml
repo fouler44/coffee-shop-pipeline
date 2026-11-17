@@ -1,0 +1,57 @@
+models:
+  - name: fct_order_items
+    description: >
+      One row per order line. Product and customer keys identify the versions
+      in effect at the order timestamp. Anonymous sales remain in the fact.
+    columns:
+      - name: order_item_id
+        description: Source line identifier and unique key of the fact.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: order_id
+        description: Source order identifier, shared by all lines of the order.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('silver_orders')
+                field: order_id
+
+      - name: product_sk
+        description: Key of the product version in effect when the order was placed.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_products')
+                field: product_sk
+
+      - name: customer_sk
+        description: >
+          Key of the customer version in effect when the order was placed.
+          Null is expected for anonymous sales.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_sk
+
+      - name: order_date
+        description: Order date in Mexico City local time and key to the calendar.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_day
+
+      - name: quantity
+        description: Units sold on this line.
+
+      - name: unit_price
+        description: Unit price applied to the sale, as recorded on the order line.
+
+      - name: line_total
+        description: Line amount carried from silver_order_items. Currency is unspecified.
