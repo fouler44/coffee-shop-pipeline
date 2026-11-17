@@ -7,7 +7,7 @@ models:
     columns:
       - name: product_sk
         description: Stable key for a product version, generated from source_record_id.
-        tests:
+        data_tests:
           - not_null
           - unique
 
@@ -43,7 +43,7 @@ models:
     columns:
       - name: customer_sk
         description: Stable key for a customer version, generated from source_record_id.
-        tests:
+        data_tests:
           - not_null
           - unique
 
@@ -80,7 +80,7 @@ models:
     columns:
       - name: date_day
         description: Calendar date and unique key, stored as a DATE.
-        tests:
+        data_tests:
           - not_null
           - unique
 
