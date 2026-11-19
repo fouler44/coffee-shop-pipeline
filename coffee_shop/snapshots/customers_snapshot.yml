@@ -1,0 +1,8 @@
+snapshots:
+  - name: customers_snapshot
+    relation: ref('silver_customers')
+    description: Snapshot of the customers table
+    config:
+      strategy: timestamp
+      unique_key: customer_id
+      updated_at: source_updated_at

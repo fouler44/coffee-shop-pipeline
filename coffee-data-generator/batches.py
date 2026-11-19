@@ -100,12 +100,14 @@ def dimension_history(config):
     # Only this stable subset can change; the rest exercise unchanged SCD rows.
     mutable_customers = rng.sample(customers, int(len(customers) * 0.5))
     mutable_products = rng.sample(catalog, len(catalog) // 2)
-    for start, end in monthly_bounds():
+    # January establishes the baseline. New entities must be delivered before
+    # they can change, so each delivery has at most one version per entity.
+    for start, end in monthly_bounds()[1:]:
         for table, candidates, rate, events in (
             ("customers", mutable_customers, config.customer_change_rate, customer_events),
             ("products", mutable_products, config.product_change_rate, product_events),
         ):
-            eligible = [row for row in candidates if row["source_updated_at"] < end]
+            eligible = [row for row in candidates if row["source_updated_at"] < start]
             count = min(len(eligible), round(
                 (len(customers) if table == "customers" else len(catalog)) * rate
             ))

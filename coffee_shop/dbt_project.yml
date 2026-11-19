@@ -11,7 +11,7 @@ clean-targets:
 
 models:
   coffee_shop:
-    marts:
-      +enabled: false
+    gold:
+      +materialized: table
     silver:
       +materialized: table

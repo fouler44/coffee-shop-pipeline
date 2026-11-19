@@ -59,3 +59,7 @@ deduplicated as (
 
 select *
 from deduplicated
+qualify row_number() over (
+    partition by customer_id
+    order by source_updated_at desc, source_record_id desc
+) = 1

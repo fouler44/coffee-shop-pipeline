@@ -1,9 +1,9 @@
 models:
   - name: silver_customers
     description: >
-      One row per source customer version, deduplicated by source_record_id.
-      Normalizes contact details and flags quality issues while preserving
-      historical versions and traceability metadata.
+      Latest source version per customer_id by source_updated_at, after
+      deduplication by source_record_id. Normalizes contact details and
+      preserves quality flags and traceability metadata for the selected version.
 
     columns:
       - name: source_record_id
@@ -22,11 +22,10 @@ models:
           - not_null
 
       - name: customer_id
-        description: >
-          Business customer ID shared across historical versions; not unique in this
-          model.
+        description: Business customer ID and unique key of the current-state model.
         data_tests:
           - not_null
+          - unique
 
       - name: email
         description: >
@@ -155,9 +154,10 @@ models:
 
   - name: silver_products
     description: >
-      One row per source product version, deduplicated by source_record_id.
-      Normalizes product text while preserving historical prices and
-      traceability metadata. Absence from a delivery does not indicate removal.
+      Latest source version per product_id by source_updated_at, after
+      deduplication by source_record_id. Normalizes product text and preserves
+      traceability metadata for the selected version. Absence from a delivery
+      does not indicate removal.
 
     columns:
       - name: source_record_id
@@ -176,10 +176,10 @@ models:
           - not_null
 
       - name: product_id
-        description: >
-          Business product ID shared across historical versions; not unique in this
-          model.
-
+        description: Business product ID and unique key of the current-state model.
+        data_tests:
+          - not_null
+          - unique
 
       - name: size
         description: >
@@ -269,7 +269,20 @@ models:
         description: >
           Shared across product versions; historical matching also requires the order
           time.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('silver_products')
+                field: product_id
 
+      - name: order_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('silver_orders')
+                field: order_id
 
       - name: batch_id
         description: >

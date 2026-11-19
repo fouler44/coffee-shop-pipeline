@@ -59,6 +59,14 @@ Archivos de origen
   no asumir que un filtro fecha > max(fecha) resuelve todos esos casos.
 - Un ensayo útil incluye carga inicial, segundo lote, repetición sin duplicados
   inesperados y reconstrucción de transformaciones desde bronze.
+- Para practicar snapshots, el generador entrega estados iniciales en enero y
+  como máximo una versión por entidad y lote, salvo duplicados intencionales.
+  Los cambios empiezan desde el mes posterior a la primera entrega. Bronze
+  acumula las versiones recibidas. `silver_products` y `silver_customers` entregan
+  la última versión por ID de negocio según `source_updated_at` para que cada
+  snapshot reciba una fila por clave. Ejecutar silver y las snapshots después
+  de cada lote permite observar cada versión. Pedidos, líneas y pagos conservan
+  sus eventos distintos.
 
 ## Estado y límites de este contexto
 
