@@ -1,80 +1,78 @@
 # Coffee shop: datos para un pipeline incremental y SCD tipo 2
 
-Simulación reproducible de enero a junio de 2025. Produce seis entregas mensuales,
-con cambios reales de negocio y errores controlados. No implementa el pipeline
-de limpieza ni construye las dimensiones SCD: esos son los ejercicios posteriores.
+Simulación reproducible de enero a junio de 2025. El generador produce seis
+entregas mensuales con cambios de negocio y errores controlados. Los scripts de
+`warehouse/` cargan Bronze en DuckDB. dbt construye Silver, las snapshots SCD
+y las tablas Gold para análisis.
 
-## Configurar dbt y DuckDB
+## Entornos de dbt
 
-El proyecto de dbt está en `coffee_shop/`. Por ahora contiene la plantilla de
-Jaffle Shop, con sus modelos y seeds de ejemplo; todavía no transforma los datos
-de `data/coffee_2025_csv/raw` ni implementa el pipeline incremental y SCD tipo 2.
+Cada target usa un archivo DuckDB distinto. La macro `generate_schema_name`
+agrupa las salidas de dbt en un esquema para `dev` y `ci`. El source de Bronze
+resuelve su esquema según el target y la ingesta debe escribir en ese mismo
+esquema.
 
-Desde la raíz del repositorio, instala las dependencias fijadas en `uv.lock`
-y comprueba la versión de dbt:
+| Target | Archivo predeterminado | Esquemas |
+|---|---|---|
+| `dev` | `data/coffee_shop.duckdb` | Todas las capas en `dev` |
+| `ci` | `data/coffee_shop_ci.duckdb` | Todas las capas en `ci` |
+| `prod` | `data/coffee_shop_prod.duckdb` | `bronze`, `silver` (incluye snapshots), `gold` |
+
+Desde la raíz del repositorio, instala las dependencias fijadas en `uv.lock`.
+GitHub Actions usa dbt v2.0.9, que incorpora el adaptador de DuckDB.
 
 ```powershell
 uv sync --locked
-uv run --locked dbt --version
-New-Item -ItemType Directory -Path data -Force
+uv tool install --python 3.13 dbt==2.0.9
+dbt --version
 ```
 
-La versión fijada es dbt 2.0.6. Su adaptador de DuckDB viene incorporado; no hace
-falta instalar el paquete `dbt-duckdb` de dbt v1. El proyecto ya está inicializado,
-por lo que no es necesario volver a ejecutar `dbt init` después de clonarlo.
-
-Crea `profiles.yml` en la raíz del repositorio, junto a `pyproject.toml`, con este
-contenido. Sustituye la ruta de ejemplo por la ruta absoluta a `data/coffee_shop.duckdb`
-en tu equipo; en Windows puedes usar `/` como separador:
-
-```yaml
-coffee_shop:
-  target: dev
-  outputs:
-    dev:
-      type: duckdb
-      path: 'C:/ruta/coffee-shop-pipeline/data/coffee_shop.duckdb'
-      schema: dev
-      threads: 4
-```
-
-El nombre `coffee_shop` coincide con `profile:` en `coffee_shop/dbt_project.yml`.
-DuckDB crea el archivo de base de datos si todavía no existe. El perfil es local
-y está ignorado por Git, por lo que cada persona debe crear el suyo.
-
-Comprueba la conexión e instala los paquetes declarados en `coffee_shop/packages.yml`:
+Si todavía no tienes un perfil local, copia `coffee_shop/profiles.example.yml` a
+`coffee_shop/profiles.yml`. Si ya tienes uno, puedes incorporar los targets que
+te falten conservando los valores de tu perfil. Git ignora el perfil local.
 
 ```powershell
-uv run --locked dbt debug --project-dir coffee_shop --profiles-dir .
-uv run --locked dbt deps --project-dir coffee_shop --profiles-dir .
+Copy-Item coffee_shop/profiles.example.yml coffee_shop/profiles.yml
+dbt deps --project-dir coffee_shop --profiles-dir coffee_shop --target dev
 ```
 
-`dbt debug` debe terminar con `All checks passed!`. Los comandos indican
-explícitamente la carpeta del proyecto y la del perfil. La base de datos, los logs,
-`target/` y `dbt_packages/` también están ignorados por Git.
-
-## Preparar bronze de desarrollo
-
-Se usa una sola base persistente, `data/coffee_shop.duckdb`. En desarrollo todas
-las capas comparten el esquema `dev`; en producción se usarán `bronze`, `silver`
-y `gold`. Los nombres de tablas y modelos dentro de `dev` deberán ser distintos.
-
-Desde la raíz del repositorio:
+Para iniciar Bronze en desarrollo, ejecuta lo siguiente desde la raíz. Después
+puedes cargar un CSV con `warehouse/03_load_bronze.py --batch batch_001 --entity customers`.
 
 ```powershell
 uv run --locked python warehouse/01_setup.py
+uv run --locked python warehouse/02_bronze_tables.py
 ```
 
-El script abre o crea la base y crea `dev` si no existe. Puede repetirse sin borrar
-los datos. Todavía no crea tablas ni carga CSV. La macro `generate_schema_name`
-agrupa los modelos en `target.schema` para los targets `dev` y `ci`; para `prod`
-usa el esquema personalizado configurado en cada modelo. No configura la ingesta
-ni los sources. Aún falta adaptar los modelos y sources de la plantilla al pipeline
-y definir el target de producción.
+## CI y despliegue de producción
 
-`warehouse/` contiene la implementación actual de preparación del almacén.
-Cuando migremos a Snowflake se sustituirá esa implementación; Git conservará
-la versión de DuckDB.
+CI valida los PR hacia `main` en un runner limpio. Ejecuta las pruebas del
+generador, carga las cinco entidades de cada lote en un archivo DuckDB aislado
+y ejecuta `dbt build` después de cada lote. Así se prueban también las versiones
+que capturan las snapshots.
+
+El despliegue se ejecuta cuando se actualiza `main` o se lanza manualmente desde
+esa rama. Reconstruye los seis lotes sintéticos en orden y publica el archivo de
+producción y las cinco tablas Gold en Parquet como artefacto de la ejecución.
+En GitHub, abre **Actions → Deploy dbt (Production)**, elige una ejecución
+exitosa y descarga `coffee-shop-prod-<commit>` de **Artifacts**. Los artefactos
+tienen la retención configurada en el repositorio.
+
+Para obtener los mismos archivos localmente, ejecuta desde la raíz:
+
+```powershell
+uv run --locked python warehouse/build_duckdb.py --target prod
+```
+
+El script requiere una ruta de base nueva. Para conservar una construcción anterior,
+usa `--database data/otra_revision.duckdb`. También puedes reproducir CI localmente
+con `--target ci`.
+
+En Power BI Desktop, usa **Obtener datos → Parquet** e importa las tres
+dimensiones y los dos hechos de `data/coffee_shop_prod_gold/`. La producción
+provisional se reconstruye desde los lotes sintéticos en cada despliegue. Cuando
+el proyecto migre a S3 y Snowflake, se sustituirá esta implementación de
+`warehouse/` y Power BI podrá leer Gold desde Snowflake.
 
 ## Ejecutar el generador
 

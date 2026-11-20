@@ -1,13 +1,8 @@
-from pathlib import Path
-
 import duckdb
 import csv
 import argparse
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DB_PATH = PROJECT_ROOT / "data" / "coffee_shop.duckdb"
-
-RAW_ROOT = PROJECT_ROOT / "data" / "coffee_2025_csv" / "raw"
+from duckdb_config import BRONZE_SCHEMA, DB_PATH, RAW_ROOT
 
 parser = argparse.ArgumentParser(description="Carga archivos a bronze")
 
@@ -28,8 +23,6 @@ args = parser.parse_args()
 BATCH_ID = args.batch
 
 ENTITY = args.entity
-TABLE_NAME = f"dev.{ENTITY}"
-
 CSV_PATH = RAW_ROOT / BATCH_ID / f"{ENTITY}.csv"
 SOURCE_FILE = CSV_PATH.relative_to(RAW_ROOT).as_posix()
 
@@ -43,10 +36,11 @@ def load_bronze():
         expected_rows = sum(1 for _ in reader)
 
     with duckdb.connect(str(DB_PATH)) as conn:
+        conn.execute("SET SCHEMA = ?", [BRONZE_SCHEMA])
         result = conn.execute(
             f"""
             SELECT COUNT(*)
-            FROM {TABLE_NAME}
+            FROM {ENTITY}
             WHERE _batch_id = ?
               AND _source_file = ?
             """,
@@ -69,7 +63,7 @@ def load_bronze():
         try:
             conn.execute(
                 rf"""
-                INSERT INTO {TABLE_NAME} BY NAME
+                INSERT INTO {ENTITY} BY NAME
                 SELECT
                     * EXCLUDE (ordinality),
                     ? AS _batch_id,
@@ -90,7 +84,7 @@ def load_bronze():
             loaded_rows = conn.execute(
                 f"""
                 SELECT COUNT(*)
-                FROM {TABLE_NAME}
+                FROM {ENTITY}
                 WHERE _batch_id = ?
                   AND _source_file = ?
                 """,

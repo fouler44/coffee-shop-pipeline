@@ -1,8 +1,7 @@
 sources:
   - name: bronze
     description: This layer contains the raw data ingested from the source systems.
-    database: coffee_shop
-    schema: dev
+    schema: "{{ 'bronze' if target.name == 'prod' else target.schema }}"
     tables:
       - name: customers
         description: This table contains the raw data of customers ingested from the source system.

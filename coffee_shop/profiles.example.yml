@@ -1,0 +1,18 @@
+coffee_shop:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: data/coffee_shop.duckdb
+      schema: dev
+      threads: 4
+    ci:
+      type: duckdb
+      path: "{{ env_var('COFFEE_DUCKDB_PATH', 'data/coffee_shop_ci.duckdb') }}"
+      schema: ci
+      threads: 4
+    prod:
+      type: duckdb
+      path: "{{ env_var('COFFEE_DUCKDB_PATH', 'data/coffee_shop_prod.duckdb') }}"
+      schema: silver
+      threads: 4
