@@ -53,7 +53,7 @@ que capturan las snapshots.
 
 El despliegue se ejecuta cuando se actualiza `main` o se lanza manualmente desde
 esa rama. Reconstruye los seis lotes sintéticos en orden y publica el archivo de
-producción y las cinco tablas Gold en Parquet como artefacto de la ejecución.
+producción y las tablas Gold en Parquet como artefacto de la ejecución.
 En GitHub, abre **Actions → Deploy dbt (Production)**, elige una ejecución
 exitosa y descarga `coffee-shop-prod-<commit>` de **Artifacts**. Los artefactos
 tienen la retención configurada en el repositorio.
@@ -68,8 +68,8 @@ El script requiere una ruta de base nueva. Para conservar una construcción ante
 usa `--database data/otra_revision.duckdb`. También puedes reproducir CI localmente
 con `--target ci`.
 
-En Power BI Desktop, usa **Obtener datos → Parquet** e importa las tres
-dimensiones y los dos hechos de `data/coffee_shop_prod_gold/`. La producción
+Consulta el [reporte de Power BI](powerbi/README.md) para abrir el archivo
+`.pbix` y actualizarlo con los Parquet de Gold. La producción
 provisional se reconstruye desde los lotes sintéticos en cada despliegue. Cuando
 el proyecto migre a S3 y Snowflake, se sustituirá esta implementación de
 `warehouse/` y Power BI podrá leer Gold desde Snowflake.
