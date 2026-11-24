@@ -1,21 +1,18 @@
-from pathlib import Path
-
 import duckdb
 
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DB_PATH = PROJECT_ROOT / "data" / "coffee_shop.duckdb"
+from duckdb_config import BRONZE_SCHEMA, DB_PATH
 
 
 def setup_database():
-    """Prepara la base persistente y el esquema de desarrollo."""
+    """Prepara la base y el esquema de las tablas de origen."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     with duckdb.connect(str(DB_PATH)) as conn:
-        conn.execute("CREATE SCHEMA IF NOT EXISTS dev")
+        quoted_schema = BRONZE_SCHEMA.replace('"', '""')
+        conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{quoted_schema}"')
 
     print(f"Base de datos: {DB_PATH}")
-    print("Esquema disponible: dev")
+    print(f"Esquema disponible: {BRONZE_SCHEMA}")
 
 
 if __name__ == "__main__":

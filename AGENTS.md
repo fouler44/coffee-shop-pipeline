@@ -31,8 +31,9 @@ Archivos de origen
   en prod se separan en bronze, silver y gold. La macro generate_schema_name
   usa target.schema en dev/ci y el esquema personalizado en prod. Los sources
   y la ingesta deben configurarse por entorno aparte; la macro no los redirige.
-  DuckDB es temporal:
-  al migrar a Snowflake se sustituye la implementación en warehouse/, sin
+  DuckDB es temporal. Mientras tanto, dev, CI y prod usan archivos separados.
+  Prod reconstruye los seis lotes en orden y publica Gold para Power BI.
+  Al migrar a Snowflake se sustituye la implementación en warehouse/, sin
   mantener dos implementaciones paralelas.
 - Las tablas bronze se declaran como sources de dbt; los modelos siguientes usan
   source() y ref() según corresponda. Declarar sources no carga ni crea las tablas.
@@ -72,8 +73,8 @@ Archivos de origen
 
 Esta es una decisión de diseño, no una afirmación de que S3 y Snowflake estén
 configurados. Antes de describir el estado real, revisar los archivos pertinentes.
-El README documenta un generador con seis lotes CSV y una plantilla dbt con
-DuckDB; distinguir ese punto de partida de la arquitectura objetivo.
+El README documenta el flujo con seis lotes CSV, DuckDB y dbt. Distinguir esta
+implementación temporal de la arquitectura objetivo.
 
 Formato acordado: CSV UTF-8 con encabezado, nulos `\N` y booleanos `true`/`false`.
 Leer README.md para el contrato de datos. Usar solo los datos raw como entrada al

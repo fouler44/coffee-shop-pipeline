@@ -13,5 +13,11 @@ models:
   coffee_shop:
     gold:
       +materialized: table
+      +schema: gold
     silver:
       +materialized: table
+      +schema: silver
+
+snapshots:
+  coffee_shop:
+    +schema: silver

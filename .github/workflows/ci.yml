@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: dbt-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -31,8 +35,13 @@ jobs:
       - name: Test data generator
         run: uv run --locked python -m unittest discover -s coffee-data-generator/tests -v
 
-      - name: Prepare local DuckDB database
-        run: uv run --locked python warehouse/01_setup.py
+      - name: Install dbt v2
+        run: |
+          uv tool install --python 3.13 dbt==2.0.9
+          uv tool dir --bin >> "$GITHUB_PATH"
 
-      # dbt build se añadirá cuando la ingesta cree las tablas bronze
-      # y existan modelos del pipeline habilitados para validarlas.
+      - name: Configure the dbt profile
+        run: cp coffee_shop/profiles.example.yml coffee_shop/profiles.yml
+
+      - name: Load the deliveries and run dbt build (CI)
+        run: uv run --locked python warehouse/build_duckdb.py --target ci

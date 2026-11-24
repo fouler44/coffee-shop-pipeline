@@ -1,13 +1,11 @@
-from pathlib import Path
 import duckdb
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DB_PATH = PROJECT_ROOT / "data" / "coffee_shop.duckdb"
+from duckdb_config import BRONZE_SCHEMA, DB_PATH
 
 def create_bronze_tables():
-    """Crea las tablas de la capa bronce en el esquema dev."""
+    """Crea las tablas de la capa Bronze en el esquema configurado."""
     with duckdb.connect(str(DB_PATH)) as conn:
-        conn.execute("SET SCHEMA = 'dev'")
+        conn.execute("SET SCHEMA = ?", [BRONZE_SCHEMA])
 
         # Crear tabla customers
         conn.execute("""

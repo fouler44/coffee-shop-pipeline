@@ -1,0 +1,54 @@
+name: Deploy dbt (Production)
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dbt-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+
+    steps:
+      - name: Checkout production revision
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.11.15"
+
+      - name: Set up Python and install locked dependencies
+        run: |
+          uv python install
+          uv sync --locked
+
+      - name: Install dbt v2
+        run: |
+          uv tool install --python 3.13 dbt==2.0.9
+          uv tool dir --bin >> "$GITHUB_PATH"
+
+      - name: Configure the dbt profile
+        run: cp coffee_shop/profiles.example.yml coffee_shop/profiles.yml
+
+      - name: Load the deliveries and run dbt build (Prod)
+        run: uv run --locked python warehouse/build_duckdb.py --target prod
+
+      - name: Publish production database and Gold for Power BI
+        uses: actions/upload-artifact@v7
+        with:
+          name: coffee-shop-prod-${{ github.sha }}
+          path: |
+            data/coffee_shop_prod.duckdb
+            data/coffee_shop_prod_gold/
+          if-no-files-found: error
