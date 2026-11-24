@@ -15,7 +15,7 @@ from duckdb_config import PROJECT_ROOT
 ENTITIES = ("customers", "products", "orders", "order_items", "payments")
 DATA_DIR = PROJECT_ROOT / "data"
 BRONZE_SCHEMAS = {"ci": "ci", "prod": "bronze"}
-GOLD_TABLES = ("dim_customers", "dim_date", "dim_products", "fct_order_items", "fct_payments")
+GOLD_TABLES = ("dim_customers", "dim_date", "dim_products", "fct_order_items", "fct_payments", "mart_customer_first_month")
 
 
 def export_gold(database):
